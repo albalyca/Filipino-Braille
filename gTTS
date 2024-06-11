@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 from skimage.feature import hog
 from skimage.transform import resize
 
-
-
 path = ‘insert/path/here’
 image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 plt.imshow(image, cmap='gray')
