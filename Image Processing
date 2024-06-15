@@ -16,39 +16,28 @@ for filename in os.listdir(folder_path):
     if filename.endswith('.JPG') or filename.endswith('.jpg'):  
         image_path = os.path.join(folder_path, filename)
         original_image = cv2.imread(image_path)
-        # grayscale
         gray = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-        # gaussian blur
         blurred = cv2.GaussianBlur(gray, (7,7), 0)
-        # otsu threshold
         actual_thresh = np.max(gray)/2
         threshold = math.ceil(actual_thresh)
         otsu_tv, otsu_thresh = cv2.threshold(blurred, threshold, 255, 
                                 cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        # invert image
         inverted_otsu = ~otsu_thresh
-        # fill in small areas of ones (removing noise)
-        min_ones_area = 200 # varied per class
-        # find connected components in the binary image
+        min_ones_area = 200 
         num_labels, labels, stats, centroids = 
         cv2.connectedComponentsWithStats(inverted_otsu)
-        # iterate over each connected component
         for label in range(1, num_labels):
             if stats[label, cv2.CC_STAT_AREA] < min_ones_area:
                 inverted_otsu[labels == label] = 0
-        # find contours in the image and concatenate them
         contours, _ = cv2.findContours(inverted_otsu, cv2.RETR_EXTERNAL, 
                         cv2.CHAIN_APPROX_SIMPLE)
         concatenated = np.concatenate(contours)
         x, y, w, h = cv2.boundingRect(concatenated)
-        # cropping the image
         cv2.rectangle(gray, (x, y), (x + w - 1, y + h - 1), 255, 2)
         cropped = inverted_otsu[y:y+h, x:x+w]
-        # resizing the image to 64 by 128 pixels
         resized = resize(cropped, (64, 128))
-        resized *= 255  # convert pixel values back to [0, 255] range
-        resized = resized.astype(np.uint8)  # convert data type to uint8
-        # overwrite original image to preprocessed image
+        resized *= 255  
+        resized = resized.astype(np.uint8)  
         processed_image = resized
         cv2.imwrite(image_path, processed_image)
 
