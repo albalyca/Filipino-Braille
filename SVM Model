@@ -1,0 +1,86 @@
+import os
+import cv2
+import math
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from PIL import Image
+from gtts import gTTS
+from skimage import io, color, exposure
+from skimage.transform import resize
+from skimage.feature import hog
+from skimage.io import imread
+from sklearn import svm, preprocessing
+from sklearn.preprocessing import Binarizer
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.metrics import accuracy_score, 
+    classification_report, confusion_matrix
+
+Classifications = ['babae', 'barangay', 'bulag', 'dakila', 'damdamin',
+                    'datapwat', 'halimbawa', 'halos', 'huwag', 'ilalim',
+                    'isang', 'kalayaan', 'karanasan', 'karapatan', 
+                    'kasalukuyan', 'kasaysayan', 'kultura', 
+                    'kumunikasyon', 'kundi', 'kung']
+
+datapath = 'insert/path/here'
+hogvectors = []
+labels = []
+
+for classindex, classification in enumerate(Classifications):
+    print(f'Loading class: {classification}')
+    classpath = os.path.join(datapath, classification)
+    for imagefile in os.listdir(classpath):
+        imagepath = os.path.join(classpath, imagefile)
+        img = cv2.imread(imagepath, cv2.IMREAD_GRAYSCALE)
+        img_resized = cv2.resize(img, (64, 128))
+        featurevectors = hog(img_resized, orientations=9, 
+                            pixels_per_cell=(8, 8), 
+                            cells_per_block=(2, 2), 
+                            visualize=False)
+        hogvectors.append(featurevectors)
+        labels.append(classindex)
+print('Data loaded successfully.')
+
+df = pd.DataFrame(hogvectors)
+df['Label'] = labels
+
+x = df.iloc[:, :-1]
+# labels
+y = df.iloc[:, -1]
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, 
+                                                    test_size=0.20,
+                                                    random_state=77,
+                                                    stratify=y)
+
+parameters = {'C': [0.1, 1, 10, 100], 'gamma': [0.0001, 0.001, 0.1, 1], 
+                'kernel': ['rbf', 'poly']}
+svm_classifiers = []
+
+for i, classification in enumerate(Classifications):
+    print(f'Training classifier for class: {classification}')
+    # binary target labels
+    binary_target = np.where(y_train == i, 1, 0)
+    # support vector classifier
+    svc = svm.SVC(probability=True)
+    # SVM models using GridSearchCV w/ defined parameters
+    model = GridSearchCV(svc, parameters, cv=5, verbose=1)
+    # training the model using training data
+    model.fit(x_train, binary_target)
+    svm_classifiers.append(model)
+    print(f'Best parameters for classifier {classification}:
+    {model.best_params_}')
+print('SVM classifiers trained successfully.')
+
+y_pred_proba = np.zeros((x_test.shape[0], len(Classifications)))
+
+for i, classifier in enumerate(svm_classifiers):
+    y_pred_proba[:, i] = classifier.predict_proba(x_test)[:, 1]
+
+y_pred = np.argmax(y_pred_proba, axis=1)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"The model is {accuracy * 100:.2f}% accurate")
+print(classification_report(y_test, y_pred, target_names=Classifications))
+
+np.set_printoptions(threshold=np.inf)
